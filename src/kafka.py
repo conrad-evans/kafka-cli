@@ -12,12 +12,12 @@ class Kafka:
         param1: (optional) -> string
         param2: (optional) -> string
         """
-        self.producer = None
-        self.consumer = None
         self.PRODUCER_CONFIG["bootstrap.servers"] = kafka_server_port
         self.CONSUMER_CONFIG["auto.offset.reset"] = start_time
         self.setDefaultConfig()
         self.CONSUMER_CONFIG = {**self.CONSUMER_CONFIG, **self.PRODUCER_CONFIG}
+        self.producer = Producer(self.PRODUCER_CONFIG)
+        self.consumer = Consumer(self.CONSUMER_CONFIG)
 
     def deliveryReport(self, err, msg):
         if err is not None:
@@ -26,7 +26,7 @@ class Kafka:
             print("Message delivered to {} [{}]".format(msg.topic(), msg.partition()))
 
     def produce(self, data, topic=None):
-        self.producer = Producer(self.PRODUCER_CONFIG)
+        self.setTopicToDefault(topic)
 
         self.producer.poll(0)
         self.producer.produce(topic, data.encode("utf-8"), callback=self.deliveryReport)
@@ -34,8 +34,8 @@ class Kafka:
         self.producer.flush()
 
     def consume(self, topic=None, running=True):
-        self.consumer = Consumer(self.CONSUMER_CONFIG)
-        self.consumer.subscribe([self.topic])
+        self.setTopicToDefault(topic)
+        self.consumer.subscribe([topic])
 
         while running:
             data = self.consumer.poll(1.0)
@@ -51,3 +51,11 @@ class Kafka:
             self.PRODUCER_CONFIG["bootstrap.servers"] = "localhost:9092"
         if self.CONSUMER_CONFIG['auto.offset.reset'] is None:
             self.CONSUMER_CONFIG['auto.offset.reset'] = 'earliest'
+
+    @staticmethod
+    def setTopicToDefault(topic):
+        # best to set default topic to be created once this starts running
+        if topic is None:
+            topic = "mytopic"
+            return topic
+        return topic
