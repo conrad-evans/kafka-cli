@@ -7,13 +7,17 @@ class Kafka:
     PRODUCER_CONFIG = {}
     CONSUMER_CONFIG = {"group.id": "mygroup"}
 
-    def __init__(self, kafka_server_port="localhost:9092", start_time="earliest"):
+    def __init__(self, kafka_server_port=None, start_time=None):
         """
         param1: (optional) -> string
         param2: (optional) -> string
         """
-        self.CONSUMER_CONFIG["auto.offset.reset"] = start_time
+        self.producer = None
+        self.consumer = None
         self.PRODUCER_CONFIG["bootstrap.servers"] = kafka_server_port
+        self.CONSUMER_CONFIG["auto.offset.reset"] = start_time
+        self.setDefaultConfig()
+        self.CONSUMER_CONFIG = {**self.CONSUMER_CONFIG, **self.PRODUCER_CONFIG}
 
     def deliveryReport(self, err, msg):
         if err is not None:
@@ -21,31 +25,20 @@ class Kafka:
         else:
             print("Message delivered to {} [{}]".format(msg.topic(), msg.partition()))
 
-    def produce(self, data, topic="mytopic"):
-        self.setDefaultConfig()
-        if topic is None:
-            topic = "mytopic"
+    def produce(self, data, topic=None):
+        self.producer = Producer(self.PRODUCER_CONFIG)
 
-        producer = Producer(self.PRODUCER_CONFIG)
+        self.producer.poll(0)
+        self.producer.produce(topic, data.encode("utf-8"), callback=self.deliveryReport)
 
-        producer.poll(0)
-        producer.produce(topic, data.encode("utf-8"), callback=self.deliveryReport)
+        self.producer.flush()
 
-        producer.flush()
-
-    def consume(self, topic, running=True):
-        self.setDefaultConfig()
-        if topic is None:
-            topic = "mytopic"
-        if self.CONSUMER_CONFIG["auto.offset.reset"] is None:
-            self.CONSUMER_CONFIG["auto.offset.reset"] = "earliest"
-        self.CONSUMER_CONFIG = {**self.CONSUMER_CONFIG, **self.PRODUCER_CONFIG}
-
-        consumer = Consumer(self.CONSUMER_CONFIG)
-        consumer.subscribe([topic])
+    def consume(self, topic=None, running=True):
+        self.consumer = Consumer(self.CONSUMER_CONFIG)
+        self.consumer.subscribe([self.topic])
 
         while running:
-            data = consumer.poll(1.0)
+            data = self.consumer.poll(1.0)
             if data is None:
                 continue
             if data.error():
@@ -56,3 +49,5 @@ class Kafka:
     def setDefaultConfig(self):
         if self.PRODUCER_CONFIG["bootstrap.servers"] is None:
             self.PRODUCER_CONFIG["bootstrap.servers"] = "localhost:9092"
+        if self.CONSUMER_CONFIG['auto.offset.reset'] is None:
+            self.CONSUMER_CONFIG['auto.offset.reset'] = 'earliest'
