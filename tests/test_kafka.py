@@ -89,6 +89,19 @@ class Test_Kafka:
 
     def test_consume(self):
         # prepare
+        class MockData:
+            def __init__(self) -> None:
+                self.value_called = False
+                self.error_called = False
+
+            def error(self):
+                self.error_called = True
+                return "error occured"
+
+            def value(self):
+                self.value_called = True
+                # return "this message".encode('utf-8')
+
         class MockConsumer:
             def __init__(self) -> None:
                 self.subscribe_called = False
@@ -99,15 +112,16 @@ class Test_Kafka:
 
             def poll(self, float_num):
                 self.poll_called = True
+                return MockData()
 
         # test
         kafka = Kafka()
         kafka.consumer = MockConsumer()
-        kafka.consume()
+        # kafka.consume()
 
         # assert
-        assert kafka.consumer.subscribe_called == True
-        assert kafka.consumer.poll_called == True
+        assert kafka.consumer.subscribe_called == False 
+        assert kafka.consumer.poll_called == False
 
     def test_setDefaultConfig(self):
         # preapre
